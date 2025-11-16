@@ -7,7 +7,7 @@ dotenv.config();
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages, // Only need guild messages
+    GatewayIntentBits.GuildMessages, // Listen to messages in servers
   ],
   partials: [Partials.Channel], // Needed if messages are uncached
 });
@@ -20,17 +20,32 @@ client.on(Events.MessageCreate, async (message: Message) => {
   // Ignore messages from bots
   if (message.author.bot) return;
 
-  // Only listen to a specific channel
-  const TARGET_CHANNEL_ID = process.env.TARGET_CHANNEL_ID; // Set this in your .env
-  if (!TARGET_CHANNEL_ID) {
-    console.error('❌ TARGET_CHANNEL_ID is not defined in .env');
+  // List of channels the bot should listen to (comma-separated IDs in .env)
+  const TARGET_CHANNELS = process.env.TARGET_CHANNELS?.split(',').map(id => id.trim());
+  if (!TARGET_CHANNELS || TARGET_CHANNELS.length === 0) {
+    console.error('❌ TARGET_CHANNELS is not defined in .env');
     return;
   }
 
-  if (message.channel.id !== TARGET_CHANNEL_ID) return;
+  // Only process messages in the target channels
+  if (!TARGET_CHANNELS.includes(message.channel.id)) return;
 
-  console.log(`📢 Message in target channel from ${message.author.tag}: ${message.content}`);
+  // Determine the message content
+  let messageContent = message.content;
 
+  // If no text, check for attachments
+  if (!messageContent || messageContent.trim() === '') {
+    if (message.attachments.size > 0) {
+      const urls = [...message.attachments.values()].map(a => a.url);
+      messageContent = `[Attachment(s): ${urls.join(', ')}]`;
+    } else {
+      messageContent = '[No text content]';
+    }
+  }
+
+  console.log(`📢 Message in target channel from ${message.author.tag}: ${messageContent}`);
+
+  // Send message to n8n webhook
   const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
   if (N8N_WEBHOOK_URL) {
     try {
@@ -40,7 +55,7 @@ client.on(Events.MessageCreate, async (message: Message) => {
         body: JSON.stringify({
           type: 'channel_message',
           userId: message.author.id,
-          message: message.content,
+          message: messageContent,
           channelId: message.channel.id,
         }),
       });
