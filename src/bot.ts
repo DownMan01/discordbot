@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Partials, Events, Message, CommandInteraction } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, Events, Message } from 'discord.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -7,7 +7,8 @@ dotenv.config();
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages, // Listen to normal messages
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent, // Needed to read message content
   ],
   partials: [Partials.Channel],
 });
@@ -46,12 +47,22 @@ async function sendToWebhook(payload: Record<string, any>) {
 
 // --- Listen to normal messages ---
 client.on(Events.MessageCreate, async (message: Message) => {
+  // Ignore bot messages
   if (message.author.bot) return;
+
+  console.log('DEBUG: Received message', {
+    author: message.author.tag,
+    channelId: message.channel.id,
+    content: message.content,
+  });
+
+  // Only process messages in target channels
   if (!TARGET_CHANNELS.includes(message.channel.id)) return;
 
+  // Determine message content
   let messageContent = message.content?.trim() || '';
 
-  // Check for attachments if content is empty
+  // If empty, check attachments
   if (!messageContent) {
     if (message.attachments.size > 0) {
       messageContent = `[Attachment(s): ${[...message.attachments.values()].map(a => a.url).join(', ')}]`;
@@ -60,7 +71,7 @@ client.on(Events.MessageCreate, async (message: Message) => {
     }
   }
 
-  console.log(`📢 Message from ${message.author.tag}: ${messageContent}`);
+  console.log(`📢 Message in target channel from ${message.author.tag}: ${messageContent}`);
 
   await sendToWebhook({
     type: 'channel_message',
@@ -75,11 +86,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   if (!interaction.channelId || !TARGET_CHANNELS.includes(interaction.channelId)) return;
 
-  // Construct command message
   let commandContent = `/${interaction.commandName}`;
   if (interaction.options.data.length > 0) {
     const optionsString = interaction.options.data
-      .map(opt => `${opt.name}: ${opt.value ?? '[empty]'}`)
+      .map((opt) => `${opt.name}: ${opt.value ?? '[empty]'}`)
       .join(', ');
     commandContent += ` ${optionsString}`;
   }
