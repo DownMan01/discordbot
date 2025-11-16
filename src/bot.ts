@@ -1,39 +1,37 @@
-import { Client, GatewayIntentBits, Events, Partials, Message } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, Events, Message, CommandInteraction } from 'discord.js';
 import dotenv from 'dotenv';
 
-// Load environment variables from .env file
+// Load environment variables
 dotenv.config();
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages, // Listen to messages in servers
+    GatewayIntentBits.GuildMessages, // Listen to normal messages
   ],
-  partials: [Partials.Channel], // Needed if messages are uncached
+  partials: [Partials.Channel], // Needed for uncached messages in channels
 });
 
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Bot is online! Logged in as ${c.user.tag}`);
 });
 
+// --- Listen to normal messages ---
 client.on(Events.MessageCreate, async (message: Message) => {
   // Ignore messages from bots
   if (message.author.bot) return;
 
-  // List of channels the bot should listen to (comma-separated IDs in .env)
   const TARGET_CHANNELS = process.env.TARGET_CHANNELS?.split(',').map(id => id.trim());
   if (!TARGET_CHANNELS || TARGET_CHANNELS.length === 0) {
     console.error('❌ TARGET_CHANNELS is not defined in .env');
     return;
   }
 
-  // Only process messages in the target channels
+  // Only process messages in target channels
   if (!TARGET_CHANNELS.includes(message.channel.id)) return;
 
-  // Determine the message content
+  // Determine message content
   let messageContent = message.content;
-
-  // If no text, check for attachments
   if (!messageContent || messageContent.trim() === '') {
     if (message.attachments.size > 0) {
       const urls = [...message.attachments.values()].map(a => a.url);
@@ -45,7 +43,7 @@ client.on(Events.MessageCreate, async (message: Message) => {
 
   console.log(`📢 Message in target channel from ${message.author.tag}: ${messageContent}`);
 
-  // Send message to n8n webhook
+  // Send to n8n webhook
   const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
   if (N8N_WEBHOOK_URL) {
     try {
@@ -63,15 +61,42 @@ client.on(Events.MessageCreate, async (message: Message) => {
     } catch (error) {
       console.error('❌ Error sending to webhook:', error);
     }
-  } else {
-    console.warn('❌ N8N_WEBHOOK_URL is not defined in environment.');
+  }
+});
+
+// --- Listen to slash commands ---
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return; // Only handle slash commands
+
+  const TARGET_CHANNELS = process.env.TARGET_CHANNELS?.split(',').map(id => id.trim());
+  if (!TARGET_CHANNELS || !interaction.channelId || !TARGET_CHANNELS.includes(interaction.channelId)) return;
+
+  console.log(`💬 Slash command received: /${interaction.commandName} from ${interaction.user.tag}`);
+
+  const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
+  if (N8N_WEBHOOK_URL) {
+    try {
+      await fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'slash_command',
+          userId: interaction.user.id,
+          command: interaction.commandName,
+          options: interaction.options.data, // Arguments passed to the command
+          channelId: interaction.channelId,
+        }),
+      });
+      console.log('✅ Slash command sent to webhook');
+    } catch (error) {
+      console.error('❌ Error sending slash command to webhook:', error);
+    }
   }
 });
 
 const token = process.env.DISCORD_BOT_TOKEN;
-
 if (!token) {
-  console.error('❌ Error: DISCORD_BOT_TOKEN is not defined in .env file');
+  console.error('❌ DISCORD_BOT_TOKEN is not defined in .env file');
   process.exit(1);
 }
 
