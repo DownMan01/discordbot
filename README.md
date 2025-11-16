@@ -36,9 +36,13 @@ npm install
 
 2. Create a `.env` file in the root directory (you can copy from `.env.example`):
 ```
+TARGET_CHANNELS=your_discord_channel_ids
+N8N_WEBHOOK_URL=your_n8m_webhook_url
 DISCORD_BOT_TOKEN=your_discord_bot_token_here
 ```
 
+Replace `your_discord_channel_ids` with your actual Discord channel ids (e.g 111111,11111,1111 for 3 channel).
+Replace `your_n8m_webhook_url` with your actual n8n webhhook url.
 Replace `your_discord_bot_token_here` with your actual Discord bot token.
 
 ## Usage
