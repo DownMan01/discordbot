@@ -18,7 +18,6 @@ client.once(Events.ClientReady, (c) => {
 
 // --- Listen to normal messages ---
 client.on(Events.MessageCreate, async (message: Message) => {
-  // Ignore messages from bots
   if (message.author.bot) return;
 
   const TARGET_CHANNELS = process.env.TARGET_CHANNELS?.split(',').map(id => id.trim());
@@ -27,12 +26,13 @@ client.on(Events.MessageCreate, async (message: Message) => {
     return;
   }
 
-  // Only process messages in target channels
   if (!TARGET_CHANNELS.includes(message.channel.id)) return;
 
   // Determine message content
-  let messageContent = message.content;
-  if (!messageContent || messageContent.trim() === '') {
+  let messageContent = message.content?.trim() || '';
+
+  // If empty, check attachments
+  if (!messageContent) {
     if (message.attachments.size > 0) {
       const urls = [...message.attachments.values()].map(a => a.url);
       messageContent = `[Attachment(s): ${urls.join(', ')}]`;
@@ -43,7 +43,6 @@ client.on(Events.MessageCreate, async (message: Message) => {
 
   console.log(`📢 Message in target channel from ${message.author.tag}: ${messageContent}`);
 
-  // Send to n8n webhook
   const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
   if (N8N_WEBHOOK_URL) {
     try {
@@ -66,12 +65,21 @@ client.on(Events.MessageCreate, async (message: Message) => {
 
 // --- Listen to slash commands ---
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isChatInputCommand()) return; // Only handle slash commands
+  if (!interaction.isChatInputCommand()) return;
 
   const TARGET_CHANNELS = process.env.TARGET_CHANNELS?.split(',').map(id => id.trim());
   if (!TARGET_CHANNELS || !interaction.channelId || !TARGET_CHANNELS.includes(interaction.channelId)) return;
 
-  console.log(`💬 Slash command received: /${interaction.commandName} from ${interaction.user.tag}`);
+  // Determine slash command content
+  let commandContent = `/${interaction.commandName}`;
+  if (interaction.options.data.length > 0) {
+    const optionsString = interaction.options.data
+      .map(opt => `${opt.name}: ${opt.value}`)
+      .join(', ');
+    commandContent += ` ${optionsString}`;
+  }
+
+  console.log(`💬 Slash command received from ${interaction.user.tag}: ${commandContent}`);
 
   const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
   if (N8N_WEBHOOK_URL) {
@@ -82,8 +90,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         body: JSON.stringify({
           type: 'slash_command',
           userId: interaction.user.id,
-          command: interaction.commandName,
-          options: interaction.options.data, // Arguments passed to the command
+          message: commandContent, // now includes command and arguments
           channelId: interaction.channelId,
         }),
       });
