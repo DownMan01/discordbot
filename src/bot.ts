@@ -78,6 +78,7 @@ client.on(Events.MessageCreate, async (message: Message) => {
     userId: message.author.id,
     message: messageContent,
     channelId: message.channel.id,
+      messageId: message.id,
   });
 });
 
@@ -101,6 +102,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     userId: interaction.user.id,
     message: commandContent,
     channelId: interaction.channelId,
+     interactionId: interaction.id,
   });
 });
 
