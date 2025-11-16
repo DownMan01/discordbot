@@ -1,21 +1,23 @@
-import { Client, GatewayIntentBits, Partials, Events, Message, CommandInteraction } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, Events, Message } from 'discord.js';
 import dotenv from 'dotenv';
 
+// Load environment variables
 dotenv.config();
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMessages, // Listen to normal messages
   ],
-  partials: [Partials.Channel],
+  partials: [Partials.Channel], // Needed for uncached messages in channels
 });
 
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Bot is online! Logged in as ${c.user.tag}`);
 });
 
-const TARGET_CHANNELS = process.env.TARGET_CHANNELS?.split(',').map(id => id.trim());
+// Environment variables
+const TARGET_CHANNELS = process.env.TARGET_CHANNELS?.split(',').map((id) => id.trim());
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 
 if (!TARGET_CHANNELS || TARGET_CHANNELS.length === 0) {
@@ -28,10 +30,10 @@ if (!N8N_WEBHOOK_URL) {
   process.exit(1);
 }
 
-// Helper function to send to n8n
+// --- Helper function to send to webhook ---
 async function sendToWebhook(payload: Record<string, any>) {
   try {
-    await fetch(N8N_WEBHOOK_URL, {
+    await fetch(N8N_WEBHOOK_URL!, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -48,9 +50,10 @@ client.on(Events.MessageCreate, async (message: Message) => {
   if (!TARGET_CHANNELS.includes(message.channel.id)) return;
 
   let messageContent = message.content?.trim() || '';
+
   if (!messageContent) {
     if (message.attachments.size > 0) {
-      messageContent = `[Attachment(s): ${[...message.attachments.values()].map(a => a.url).join(', ')}]`;
+      messageContent = `[Attachment(s): ${[...message.attachments.values()].map((a) => a.url).join(', ')}]`;
     } else {
       messageContent = '[No text content]';
     }
@@ -74,7 +77,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   let commandContent = `/${interaction.commandName}`;
   if (interaction.options.data.length > 0) {
     const optionsString = interaction.options.data
-      .map(opt => `${opt.name}: ${opt.value ?? '[empty]'}`)
+      .map((opt) => `${opt.name}: ${opt.value ?? '[empty]'}`)
       .join(', ');
     commandContent += ` ${optionsString}`;
   }
