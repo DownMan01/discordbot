@@ -1,22 +1,22 @@
-import { Client, GatewayIntentBits, Partials, Events, Message } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, Events, Message, CommandInteraction } from 'discord.js';
 import dotenv from 'dotenv';
 
-// Load environment variables
 dotenv.config();
 
+// --- Initialize Discord client ---
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages, // Listen to normal messages
   ],
-  partials: [Partials.Channel], // Needed for uncached messages in channels
+  partials: [Partials.Channel],
 });
 
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Bot is online! Logged in as ${c.user.tag}`);
 });
 
-// Environment variables
+// --- Environment variables ---
 const TARGET_CHANNELS = process.env.TARGET_CHANNELS?.split(',').map((id) => id.trim());
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 
@@ -30,7 +30,7 @@ if (!N8N_WEBHOOK_URL) {
   process.exit(1);
 }
 
-// --- Helper function to send to webhook ---
+// --- Helper to send data to webhook ---
 async function sendToWebhook(payload: Record<string, any>) {
   try {
     await fetch(N8N_WEBHOOK_URL!, {
@@ -51,9 +51,10 @@ client.on(Events.MessageCreate, async (message: Message) => {
 
   let messageContent = message.content?.trim() || '';
 
+  // Check for attachments if content is empty
   if (!messageContent) {
     if (message.attachments.size > 0) {
-      messageContent = `[Attachment(s): ${[...message.attachments.values()].map((a) => a.url).join(', ')}]`;
+      messageContent = `[Attachment(s): ${[...message.attachments.values()].map(a => a.url).join(', ')}]`;
     } else {
       messageContent = '[No text content]';
     }
@@ -74,10 +75,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   if (!interaction.channelId || !TARGET_CHANNELS.includes(interaction.channelId)) return;
 
+  // Construct command message
   let commandContent = `/${interaction.commandName}`;
   if (interaction.options.data.length > 0) {
     const optionsString = interaction.options.data
-      .map((opt) => `${opt.name}: ${opt.value ?? '[empty]'}`)
+      .map(opt => `${opt.name}: ${opt.value ?? '[empty]'}`)
       .join(', ');
     commandContent += ` ${optionsString}`;
   }
@@ -92,6 +94,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   });
 });
 
+// --- Login ---
 const token = process.env.DISCORD_BOT_TOKEN;
 if (!token) {
   console.error('❌ DISCORD_BOT_TOKEN is not defined in .env file');
